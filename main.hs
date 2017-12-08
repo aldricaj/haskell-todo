@@ -2,30 +2,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 import Database.MySQL.Base
 import qualified System.IO.Streams as Streams
+import Web.Scotty
+import Data.List.Split
+import Data.String
+
+
 
 --data TaskTuple = Int [Char] Bool MySQLTimeStamp
---GET request provided by the link that was given to us, because I was trying it a different way and gettting nowhere.
---{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
---import qualified Data.ByteString.Lazy.Char8 as L
---import Happstack.Server
---import Happstack.Server.Types
---import Control.Monad.IO.Class (liftIO)
-
---import Data.Data (Data, Typeable)
-
---getBody :: ServerPart L.ByteString
---getBody = do
---    req  <- askRq 
---    body <- liftIO $ takeRequestBody req 
---    case body of 
---        Just rqbody -> return . unBody $ rqbody 
---        Nothing     -> return "" 
---
---myRoute :: ServerPart Response
---myRoute = do
---    body <- getBody
---    let unit = fromJust $ A.decode body :: Unit
---    ok $ toResponse $ A.encode unit
 
 get_tasks = do 
     conn <- connect defaultConnectInfo {ciUser="root", ciPassword="UCBearcat$",ciDatabase="ToDo",ciHost="54.186.118.144"}
@@ -46,9 +29,33 @@ update_task id task_desc complete = do
     (defs, is) <- queryStmt conn s [MySQLText task_desc, MySQLInt8 (if complete then 1 else 0), MySQLInt32 id]
     return 1
 
-main = do
-    print =<< get_tasks
+check_insert = 
+    get "/create/:word" $ do
+        todo <- param "word"
 
+        insert_task (fromString todo)
 
-data Unit = Unit { x :: Int, y :: Int } deriving (Show, Eq, Data, Typeable)
+        html $ mconcat ["Task created"]
 
+check_update = 
+    get "/update/:word" $ do
+        url_text <- param "word"
+
+        let params = splitOn "|" url_text
+
+        let idT = params!!0
+        let id = read idT :: Int 
+
+        let completeT = params!!1
+        let complete = read completeT :: Bool 
+
+        let todo = params!!2
+
+        update_task (fromIntegral id) (fromString todo) complete
+
+        html $ mconcat ["Task Updated"]
+
+main = scotty 3000 $ do 
+
+    check_insert
+    check_update
